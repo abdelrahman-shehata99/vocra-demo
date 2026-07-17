@@ -1,17 +1,39 @@
 # vocra_demo
 
-A new Flutter project.
+A demo app for the [Vocra](https://github.com/abdelrahman-shehata99/vocra) voice
+AI SDK (`vocra_flutter`). Pick your providers (Groq/Gemini, Deepgram/ElevenLabs),
+set a greeting and persona, and have a spoken conversation — all orchestrated
+on-device.
 
-## Getting Started
+It exercises the SDK's `greeting` (AI speaks first), `naturalSpeech` mode, and
+the ElevenLabs model picker (including `eleven_v3` for `[laughs]`-style tags).
 
-This project is a starting point for a Flutter application.
+## Setup
 
-A few resources to get you started if this is your first Flutter project:
+This app depends on the SDK via a local path to the sibling `vocra` repo, so
+clone both side by side:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```
+your-code/
+  vocra/         # the SDK
+  vocra-demo/    # this app
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```sh
+flutter pub get
+```
+
+## Run
+
+API keys are read from `--dart-define` (nothing is committed) and can also be
+edited on the setup screen:
+
+```sh
+flutter run \
+  --dart-define=GROQ_API_KEY=... \
+  --dart-define=DEEPGRAM_API_KEY=... \
+  --dart-define=ELEVENLABS_API_KEY=...   # only if you pick ElevenLabs
+```
+
+Deepgram is always required (it does the speech recognition). The other keys are
+only needed for the providers you select.

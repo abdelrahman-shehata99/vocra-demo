@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:voice_flutter/voice_flutter.dart';
+import 'package:vocra_flutter/vocra_flutter.dart';
 
 void main() => runApp(const VocraDemoApp());
 
@@ -26,9 +26,9 @@ enum LlmChoice { groq, gemini }
 enum TtsChoice { deepgram, elevenlabs }
 
 const _groqModels = <String, String>{
-  'llama-3.1-8b-instant': 'Llama 3.1 8B Instant ⚡',
+  'openai/gpt-oss-20b': 'GPT-OSS 20B ⚡ (default)',
   'llama-3.3-70b-versatile': 'Llama 3.3 70B Versatile',
-  'openai/gpt-oss-20b': 'GPT-OSS 20B',
+  'llama-3.1-8b-instant': 'Llama 3.1 8B Instant (retires 2026-08-16)',
 };
 
 const _geminiModels = <String, String>{
@@ -65,6 +65,13 @@ const _elevenLabsVoices = <String, String>{
   'ErXwobaYiN019PkySvjV': 'Antoni — friendly, casual (M)',
 };
 
+const _elevenLabsModels = <String, String>{
+  'eleven_flash_v2_5': 'Flash v2.5 — fastest (default)',
+  'eleven_turbo_v2_5': 'Turbo v2.5 — fast, higher quality',
+  'eleven_multilingual_v2': 'Multilingual v2',
+  'eleven_v3': 'Eleven v3 — most expressive, [laughs] tags',
+};
+
 /// Step 1: pick providers/models/voices, enter keys, launch the conversation.
 class SetupPage extends StatefulWidget {
   const SetupPage({super.key});
@@ -92,6 +99,9 @@ class _SetupPageState extends State<SetupPage> {
   final _persona = TextEditingController(
     text: 'You are a friendly, concise voice assistant.',
   );
+  final _greeting = TextEditingController(
+    text: 'Hey there! What can I help you with today?',
+  );
 
   LlmChoice _llm = LlmChoice.groq;
   TtsChoice _tts = TtsChoice.deepgram;
@@ -99,6 +109,8 @@ class _SetupPageState extends State<SetupPage> {
   String _geminiModel = _geminiModels.keys.first;
   String _deepgramVoice = _deepgramVoices.keys.first;
   String _elevenLabsVoice = _elevenLabsVoices.keys.first;
+  String _elevenLabsModel = _elevenLabsModels.keys.first;
+  bool _naturalSpeech = true;
 
   @override
   void dispose() {
@@ -107,6 +119,7 @@ class _SetupPageState extends State<SetupPage> {
     _deepgramKey.dispose();
     _elevenLabsKey.dispose();
     _persona.dispose();
+    _greeting.dispose();
     super.dispose();
   }
 
@@ -136,6 +149,8 @@ class _SetupPageState extends State<SetupPage> {
       return _snack('Enter your ElevenLabs API key.');
     }
 
+    final greetingText = _greeting.text.trim();
+
     // ── This is the entire SDK integration ────────────────────────────
     final session = VoiceSession(
       config: VoiceConfig(
@@ -144,11 +159,20 @@ class _SetupPageState extends State<SetupPage> {
             : GeminiLlm(apiKey: geminiKey, model: _geminiModel),
         tts: _tts == TtsChoice.deepgram
             ? DeepgramTts(apiKey: dgKey, model: _deepgramVoice)
-            : ElevenLabsTts(apiKey: elKey, voiceId: _elevenLabsVoice),
+            : ElevenLabsTts(
+                apiKey: elKey,
+                voiceId: _elevenLabsVoice,
+                modelId: _elevenLabsModel,
+              ),
         stt: DeepgramStt(apiKey: dgKey),
         systemPrompt: _persona.text.trim().isEmpty
             ? 'You are a helpful assistant.'
             : _persona.text.trim(),
+        // The AI speaks first with this line (empty = user speaks first).
+        greeting: greetingText.isEmpty ? null : Greeting.text(greetingText),
+        // Nudge the model toward brief, spoken-style replies; strips markdown/
+        // emojis before TTS and enables [laughs]-style tags on ElevenLabs v3.
+        naturalSpeech: _naturalSpeech,
       ),
     );
     // ──────────────────────────────────────────────────────────────────
@@ -171,16 +195,15 @@ class _SetupPageState extends State<SetupPage> {
     ),
   );
 
-  Widget _keyField(TextEditingController controller, String label) =>
-      TextField(
-        controller: controller,
-        obscureText: true,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-          isDense: true,
-        ),
-      );
+  Widget _keyField(TextEditingController controller, String label) => TextField(
+    controller: controller,
+    obscureText: true,
+    decoration: InputDecoration(
+      labelText: label,
+      border: const OutlineInputBorder(),
+      isDense: true,
+    ),
+  );
 
   Widget _dropdown(
     String label,
@@ -270,6 +293,13 @@ class _SetupPageState extends State<SetupPage> {
               _elevenLabsVoice,
               (v) => setState(() => _elevenLabsVoice = v),
             ),
+            const SizedBox(height: 12),
+            _dropdown(
+              'Model',
+              _elevenLabsModels,
+              _elevenLabsModel,
+              (v) => setState(() => _elevenLabsModel = v),
+            ),
           ],
           _sectionLabel('Speech recognition (STT)'),
           _keyField(_deepgramKey, 'Deepgram API key (always required)'),
@@ -282,6 +312,29 @@ class _SetupPageState extends State<SetupPage> {
               border: OutlineInputBorder(),
               isDense: true,
             ),
+          ),
+          _sectionLabel('Conversation'),
+          TextField(
+            controller: _greeting,
+            maxLines: 2,
+            decoration: const InputDecoration(
+              labelText:
+                  'Greeting — the AI speaks this first (blank = user starts)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 4),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Natural speech'),
+            subtitle: const Text(
+              'Brief spoken-style replies; strips markdown/emojis, and enables '
+              '[laughs]-style tags on ElevenLabs v3.',
+              style: TextStyle(fontSize: 12),
+            ),
+            value: _naturalSpeech,
+            onChanged: (v) => setState(() => _naturalSpeech = v),
           ),
           const SizedBox(height: 24),
           FilledButton(
@@ -328,8 +381,7 @@ class _ConversationPageState extends State<ConversationPage> {
 
   bool get _live => _state != TurnState.idle;
 
-  static String _ms(Duration? d) =>
-      d == null ? '—' : '${d.inMilliseconds}ms';
+  static String _ms(Duration? d) => d == null ? '—' : '${d.inMilliseconds}ms';
 
   @override
   void initState() {
