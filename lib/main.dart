@@ -74,15 +74,21 @@ class SetupPage extends StatefulWidget {
 }
 
 class _SetupPageState extends State<SetupPage> {
-  // TEMP debug pre-fill for emulator smoke test.
+  // Keys are read from --dart-define at build time so nothing sensitive is
+  // committed. Run e.g.:
+  //   flutter run --dart-define=GROQ_API_KEY=... --dart-define=DEEPGRAM_API_KEY=...
   final _groqKey = TextEditingController(
-    text: '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',
+    text: const String.fromEnvironment('GROQ_API_KEY'),
   );
-  final _geminiKey = TextEditingController();
+  final _geminiKey = TextEditingController(
+    text: const String.fromEnvironment('GEMINI_API_KEY'),
+  );
   final _deepgramKey = TextEditingController(
-    text: 'a4ee3a50f8f98de87b27571ae13c2a41867a0f6e',
+    text: const String.fromEnvironment('DEEPGRAM_API_KEY'),
   );
-  final _elevenLabsKey = TextEditingController();
+  final _elevenLabsKey = TextEditingController(
+    text: const String.fromEnvironment('ELEVENLABS_API_KEY'),
+  );
   final _persona = TextEditingController(
     text: 'You are a friendly, concise voice assistant.',
   );
