@@ -32,22 +32,23 @@ dependencies:
     sdk: flutter
 
   # Local path dep against the SDK in the sibling repo. Switch to the pub.dev
-  # release (`vocra: ^0.2.0`) once published.
-  vocra:
-    path: ../vocra/packages/vocra
+  # release (`vocra_flutter: ^0.2.1`) once published.
+  vocra_flutter:
+    path: ../vocra/packages/vocra_flutter
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
-# vocra depends on the hosted `vocra_core: ^0.2.0`, which isn't on
-# pub.dev yet — override it to the local package. Remove both overrides once the
-# SDK is published (and switch the dep above to `vocra: ^0.2.0`).
+# vocra_core is already published (^0.2.1 on pub.dev), but vocra_flutter isn't
+# yet, so this override keeps local development against the in-repo source
+# instead of pub.dev. Remove both overrides once vocra_flutter is published
+# (and switch the dep above to `vocra_flutter: ^0.2.1`).
 dependency_overrides:
   vocra_core:
     path: ../vocra/packages/vocra_core
-  vocra:
-    path: ../vocra/packages/vocra
+  vocra_flutter:
+    path: ../vocra/packages/vocra_flutter
 
 dev_dependencies:
   flutter_test:
