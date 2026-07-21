@@ -1,21 +1,21 @@
 PODS:
   - Flutter (1.0.0)
-  - voice_flutter (0.1.0):
+  - vocra (0.2.0):
     - Flutter
 
 DEPENDENCIES:
   - Flutter (from `Flutter`)
-  - voice_flutter (from `.symlinks/plugins/voice_flutter/ios`)
+  - vocra (from `.symlinks/plugins/vocra/ios`)
 
 EXTERNAL SOURCES:
   Flutter:
     :path: Flutter
-  voice_flutter:
-    :path: ".symlinks/plugins/voice_flutter/ios"
+  vocra:
+    :path: ".symlinks/plugins/vocra/ios"
 
 SPEC CHECKSUMS:
   Flutter: cabc95a1d2626b1b06e7179b784ebcf0c0cde467
-  voice_flutter: 404c42df031b763a0d641c11a74de6bb3870ba49
+  vocra: 5695eecd7a726fd821e6ae4845d92d40529a77e7
 
 PODFILE CHECKSUM: 3c63482e143d1b91d2d2560aee9fb04ecc74ac7e
 
