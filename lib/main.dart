@@ -21,7 +21,7 @@ class VocraDemoApp extends StatelessWidget {
   }
 }
 
-enum LlmChoice { groq, gemini }
+enum LlmChoice { groq, openai, gemini }
 
 enum TtsChoice { deepgram, elevenlabs }
 
@@ -29,6 +29,12 @@ const _groqModels = <String, String>{
   'openai/gpt-oss-20b': 'GPT-OSS 20B ⚡ (default)',
   'llama-3.3-70b-versatile': 'Llama 3.3 70B Versatile',
   'llama-3.1-8b-instant': 'Llama 3.1 8B Instant (retires 2026-08-16)',
+};
+
+const _openAiModels = <String, String>{
+  'gpt-4.1-mini': 'GPT-4.1 Mini ⚡ (default)',
+  'gpt-4.1-nano': 'GPT-4.1 Nano (fastest)',
+  'gpt-4.1': 'GPT-4.1',
 };
 
 const _geminiModels = <String, String>{
@@ -87,6 +93,9 @@ class _SetupPageState extends State<SetupPage> {
   final _groqKey = TextEditingController(
     text: const String.fromEnvironment('GROQ_API_KEY'),
   );
+  final _openAiKey = TextEditingController(
+    text: const String.fromEnvironment('OPENAI_API_KEY'),
+  );
   final _geminiKey = TextEditingController(
     text: const String.fromEnvironment('GEMINI_API_KEY'),
   );
@@ -99,13 +108,22 @@ class _SetupPageState extends State<SetupPage> {
   final _persona = TextEditingController(
     text: 'You are a friendly, concise voice assistant.',
   );
+  final _assistantName = TextEditingController();
   final _greeting = TextEditingController(
     text: 'Hey there! What can I help you with today?',
   );
+  // Session policies (leave blank to disable).
+  final _endPhrases = TextEditingController(text: 'goodbye, talk to you later');
+  final _endMessage = TextEditingController(
+    text: 'Thanks for chatting. Take care!',
+  );
+  final _silenceSeconds = TextEditingController();
+  final _maxMinutes = TextEditingController();
 
   LlmChoice _llm = LlmChoice.groq;
   TtsChoice _tts = TtsChoice.deepgram;
   String _groqModel = _groqModels.keys.first;
+  String _openAiModel = _openAiModels.keys.first;
   String _geminiModel = _geminiModels.keys.first;
   String _deepgramVoice = _deepgramVoices.keys.first;
   String _elevenLabsVoice = _elevenLabsVoices.keys.first;
@@ -115,11 +133,17 @@ class _SetupPageState extends State<SetupPage> {
   @override
   void dispose() {
     _groqKey.dispose();
+    _openAiKey.dispose();
     _geminiKey.dispose();
     _deepgramKey.dispose();
     _elevenLabsKey.dispose();
     _persona.dispose();
+    _assistantName.dispose();
     _greeting.dispose();
+    _endPhrases.dispose();
+    _endMessage.dispose();
+    _silenceSeconds.dispose();
+    _maxMinutes.dispose();
     super.dispose();
   }
 
@@ -131,12 +155,16 @@ class _SetupPageState extends State<SetupPage> {
 
   void _start() {
     final groqKey = _groqKey.text.trim();
+    final openAiKey = _openAiKey.text.trim();
     final geminiKey = _geminiKey.text.trim();
     final dgKey = _deepgramKey.text.trim();
     final elKey = _elevenLabsKey.text.trim();
 
     if (_llm == LlmChoice.groq && groqKey.isEmpty) {
       return _snack('Enter your Groq API key.');
+    }
+    if (_llm == LlmChoice.openai && openAiKey.isEmpty) {
+      return _snack('Enter your OpenAI API key.');
     }
     if (_llm == LlmChoice.gemini && geminiKey.isEmpty) {
       return _snack('Enter your Gemini API key.');
@@ -150,35 +178,65 @@ class _SetupPageState extends State<SetupPage> {
     }
 
     final greetingText = _greeting.text.trim();
+    final assistantName = _assistantName.text.trim();
 
     // ── This is the entire SDK integration ────────────────────────────
     final session = VocraSession(
       config: VocraConfig(
-        llm: _llm == LlmChoice.groq
-            ? GroqLlm(apiKey: groqKey, model: _groqModel)
-            : GeminiLlm(apiKey: geminiKey, model: _geminiModel),
+        // Provider facades pick the service in one line.
+        llm: switch (_llm) {
+          LlmChoice.groq => VocraLlm.groq(apiKey: groqKey, model: _groqModel),
+          LlmChoice.openai => VocraLlm.openAi(
+            apiKey: openAiKey,
+            model: _openAiModel,
+          ),
+          LlmChoice.gemini => VocraLlm.gemini(
+            apiKey: geminiKey,
+            model: _geminiModel,
+          ),
+        },
         tts: _tts == TtsChoice.deepgram
-            ? DeepgramTts(apiKey: dgKey, model: _deepgramVoice)
-            : ElevenLabsTts(
+            ? VocraTts.deepgram(apiKey: dgKey, voice: _deepgramVoice)
+            : VocraTts.elevenLabs(
                 apiKey: elKey,
                 voiceId: _elevenLabsVoice,
-                modelId: _elevenLabsModel,
+                model: _elevenLabsModel,
               ),
-        stt: DeepgramStt(apiKey: dgKey),
+        stt: VocraStt.deepgram(apiKey: dgKey),
         systemPrompt: _persona.text.trim().isEmpty
             ? 'You are a helpful assistant.'
             : _persona.text.trim(),
+        assistantName: assistantName.isEmpty ? null : assistantName,
         // The AI speaks first with this line (empty = user speaks first).
         greeting: greetingText.isEmpty ? null : Greeting.text(greetingText),
         // Nudge the model toward brief, spoken-style replies; strips markdown/
         // emojis before TTS and enables [laughs]-style tags on ElevenLabs v3.
         naturalSpeech: _naturalSpeech,
+        // Auto-end rules — say an end phrase, go silent, or hit the cap.
+        policies: _buildPolicies(),
       ),
     );
     // ──────────────────────────────────────────────────────────────────
 
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => ConversationPage(session: session)),
+    );
+  }
+
+  SessionPolicies _buildPolicies() {
+    final phrases = _endPhrases.text
+        .split(',')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    final silence = int.tryParse(_silenceSeconds.text.trim());
+    final maxMin = int.tryParse(_maxMinutes.text.trim());
+    final endMsg = _endMessage.text.trim();
+    return SessionPolicies(
+      endPhrases: phrases,
+      endMessage: endMsg.isEmpty ? null : endMsg,
+      silenceTimeout: silence == null ? null : Duration(seconds: silence),
+      maxDuration: maxMin == null ? null : Duration(minutes: maxMin),
     );
   }
 
@@ -239,6 +297,7 @@ class _SetupPageState extends State<SetupPage> {
           SegmentedButton<LlmChoice>(
             segments: const [
               ButtonSegment(value: LlmChoice.groq, label: Text('Groq')),
+              ButtonSegment(value: LlmChoice.openai, label: Text('OpenAI')),
               ButtonSegment(value: LlmChoice.gemini, label: Text('Gemini')),
             ],
             selected: {_llm},
@@ -253,6 +312,15 @@ class _SetupPageState extends State<SetupPage> {
               _groqModels,
               _groqModel,
               (v) => setState(() => _groqModel = v),
+            ),
+          ] else if (_llm == LlmChoice.openai) ...[
+            _keyField(_openAiKey, 'OpenAI API key (sk-…)'),
+            const SizedBox(height: 12),
+            _dropdown(
+              'Model',
+              _openAiModels,
+              _openAiModel,
+              (v) => setState(() => _openAiModel = v),
             ),
           ] else ...[
             _keyField(_geminiKey, 'Gemini API key (AIza…)'),
@@ -313,6 +381,15 @@ class _SetupPageState extends State<SetupPage> {
               isDense: true,
             ),
           ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _assistantName,
+            decoration: const InputDecoration(
+              labelText: 'Assistant name (optional, e.g. Riley)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
           _sectionLabel('Conversation'),
           TextField(
             controller: _greeting,
@@ -335,6 +412,52 @@ class _SetupPageState extends State<SetupPage> {
             ),
             value: _naturalSpeech,
             onChanged: (v) => setState(() => _naturalSpeech = v),
+          ),
+          _sectionLabel('Auto-end policies (optional)'),
+          TextField(
+            controller: _endPhrases,
+            decoration: const InputDecoration(
+              labelText: 'End phrases (comma-separated)',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _endMessage,
+            decoration: const InputDecoration(
+              labelText: 'Farewell spoken before an auto-end',
+              border: OutlineInputBorder(),
+              isDense: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _silenceSeconds,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Silence timeout (s)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: TextField(
+                  controller: _maxMinutes,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Max duration (min)',
+                    border: OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 24),
           FilledButton(
