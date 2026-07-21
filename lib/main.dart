@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:vocra_flutter/vocra_flutter.dart';
+import 'package:vocra/vocra.dart';
 
 void main() => runApp(const VocraDemoApp());
 
@@ -152,8 +152,8 @@ class _SetupPageState extends State<SetupPage> {
     final greetingText = _greeting.text.trim();
 
     // ── This is the entire SDK integration ────────────────────────────
-    final session = VoiceSession(
-      config: VoiceConfig(
+    final session = VocraSession(
+      config: VocraConfig(
         llm: _llm == LlmChoice.groq
             ? GroqLlm(apiKey: groqKey, model: _groqModel)
             : GeminiLlm(apiKey: geminiKey, model: _geminiModel),
@@ -360,24 +360,25 @@ class _SetupPageState extends State<SetupPage> {
 class ConversationPage extends StatefulWidget {
   const ConversationPage({super.key, required this.session});
 
-  final VoiceSession session;
+  final VocraSession session;
 
   @override
   State<ConversationPage> createState() => _ConversationPageState();
 }
 
 class _ConversationPageState extends State<ConversationPage> {
-  late final VoiceSession _session = widget.session;
+  late final VocraSession _session = widget.session;
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
 
   TurnState _state = TurnState.idle;
-  final List<TranscriptEvent> _transcript = [];
+  List<TranscriptEvent> _transcript = const [];
   TurnMetrics? _metrics;
   String? _error;
   bool _busy = false;
+  bool _muted = false;
 
-  final _subs = <StreamSubscription<dynamic>>[];
+  VocraSubscription? _sub;
 
   bool get _live => _state != TurnState.idle;
 
@@ -386,27 +387,58 @@ class _ConversationPageState extends State<ConversationPage> {
   @override
   void initState() {
     super.initState();
-    _subs.add(_session.turnState.listen((s) => setState(() => _state = s)));
-    _subs.add(_session.metrics.listen((m) => setState(() => _metrics = m)));
-    _subs.add(
-      _session.errors.listen((e) => setState(() => _error = e.message)),
-    );
-    _subs.add(
-      _session.transcripts.listen((event) {
-        setState(() {
-          final last = _transcript.isEmpty ? null : _transcript.last;
-          // Any event from the same speaker REPLACES a preceding interim —
-          // interim→interim gives live word-by-word updating, and the final
-          // replaces the last interim in place instead of appending a
-          // duplicate bubble.
-          if (last != null && !last.isFinal && last.source == event.source) {
-            _transcript[_transcript.length - 1] = event;
-          } else {
-            _transcript.add(event);
-          }
-        });
+    // One observe() call, and the SDK hands us the already-merged conversation.
+    _sub = _session.observe(
+      onState: (s) => setState(() => _state = s),
+      onMetrics: (m) => setState(() => _metrics = m),
+      onError: (e) => setState(() => _error = e.message),
+      onMessages: (messages) {
+        setState(() => _transcript = messages);
         _autoScroll();
-      }),
+      },
+    );
+    // The session can end itself (an end phrase, silence, or max duration) —
+    // surface the report when that happens.
+    _session.sessionEnded.first.then((report) {
+      if (mounted) _showReport(report);
+    });
+  }
+
+  Future<void> _toggleMute() async {
+    setState(() {
+      _muted = !_muted;
+      _muted ? _session.mute() : _session.unmute();
+    });
+  }
+
+  Future<void> _endSession() async {
+    if (!_live) return;
+    try {
+      final report = await _session.endSession();
+      if (mounted) _showReport(report);
+    } catch (e) {
+      if (mounted) setState(() => _error = 'endSession failed: $e');
+    }
+  }
+
+  void _showReport(SessionReport report) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Session report'),
+        content: Text(
+          'Reason: ${report.endReason.name}\n'
+          'Messages: ${report.messages.length}\n'
+          'Turns: ${report.turnCount}\n'
+          'Duration: ${report.duration.inSeconds}s',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
     );
   }
 
@@ -420,9 +452,7 @@ class _ConversationPageState extends State<ConversationPage> {
 
   @override
   void dispose() {
-    for (final s in _subs) {
-      s.cancel();
-    }
+    _sub?.cancel();
     _textController.dispose();
     _scrollController.dispose();
     _session.dispose();
@@ -462,7 +492,21 @@ class _ConversationPageState extends State<ConversationPage> {
     };
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Conversation')),
+      appBar: AppBar(
+        title: const Text('Conversation'),
+        actions: [
+          IconButton(
+            tooltip: _muted ? 'Unmute' : 'Mute',
+            icon: Icon(_muted ? Icons.mic_off : Icons.mic),
+            onPressed: _live ? _toggleMute : null,
+          ),
+          IconButton(
+            tooltip: 'End session',
+            icon: const Icon(Icons.call_end),
+            onPressed: _live ? _endSession : null,
+          ),
+        ],
+      ),
       body: Column(
         children: [
           Container(

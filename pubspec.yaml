@@ -33,8 +33,8 @@ dependencies:
 
   # Local path dep against the SDK in the sibling repo. Switch to the pub.dev
   # release (`vocra_flutter: ^0.2.0`) once published.
-  vocra_flutter:
-    path: ../vocra/packages/vocra_flutter
+  vocra:
+    path: ../vocra/packages/vocra
 
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
@@ -46,8 +46,8 @@ dependencies:
 dependency_overrides:
   vocra_core:
     path: ../vocra/packages/vocra_core
-  vocra_flutter:
-    path: ../vocra/packages/vocra_flutter
+  vocra:
+    path: ../vocra/packages/vocra
 
 dev_dependencies:
   flutter_test:
