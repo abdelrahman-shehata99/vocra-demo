@@ -1,7 +1,7 @@
 # vocra_demo
 
 A demo app for the [Vocra](https://github.com/abdelrahman-shehata99/vocra) voice
-AI SDK (`vocra_flutter`). Pick your providers (Groq/Gemini, Deepgram/ElevenLabs),
+AI SDK (`vocra`). Pick your providers (Groq/Gemini, Deepgram/ElevenLabs),
 set a greeting and persona, and have a spoken conversation — all orchestrated
 on-device.
 
