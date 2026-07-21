@@ -21,62 +21,8 @@ class VocraDemoApp extends StatelessWidget {
   }
 }
 
-enum LlmChoice { groq, openai, gemini }
-
-enum TtsChoice { deepgram, elevenlabs }
-
-const _groqModels = <String, String>{
-  'openai/gpt-oss-20b': 'GPT-OSS 20B ⚡ (default)',
-  'llama-3.3-70b-versatile': 'Llama 3.3 70B Versatile',
-  'llama-3.1-8b-instant': 'Llama 3.1 8B Instant (retires 2026-08-16)',
-};
-
-const _openAiModels = <String, String>{
-  'gpt-4.1-mini': 'GPT-4.1 Mini ⚡ (default)',
-  'gpt-4.1-nano': 'GPT-4.1 Nano (fastest)',
-  'gpt-4.1': 'GPT-4.1',
-};
-
-const _geminiModels = <String, String>{
-  'gemini-2.5-flash': 'Gemini 2.5 Flash',
-  'gemini-2.5-flash-lite': 'Gemini 2.5 Flash-Lite ⚡',
-  'gemini-2.0-flash': 'Gemini 2.0 Flash',
-};
-
-const _deepgramVoices = <String, String>{
-  'aura-asteria-en': 'Asteria — warm, natural (F)',
-  'aura-luna-en': 'Luna — soft, gentle (F)',
-  'aura-stella-en': 'Stella — clear, bright (F)',
-  'aura-athena-en': 'Athena — British, poised (F)',
-  'aura-hera-en': 'Hera — mature, confident (F)',
-  'aura-orion-en': 'Orion — deep, resonant (M)',
-  'aura-arcas-en': 'Arcas — smooth, calm (M)',
-  'aura-perseus-en': 'Perseus — bold, clear (M)',
-  'aura-angus-en': 'Angus — Irish, warm (M)',
-  'aura-orpheus-en': 'Orpheus — rich, expressive (M)',
-  'aura-helios-en': 'Helios — British, articulate (M)',
-  'aura-zeus-en': 'Zeus — commanding, deep (M)',
-};
-
-const _elevenLabsVoices = <String, String>{
-  'EXAVITQu4vr4xnSDxMaL': 'Sarah — soft, warm (F)',
-  '21m00Tcm4TlvDq8ikWAM': 'Rachel — calm, clear (F)',
-  'AZnzlk1XvdvUeBnXmlld': 'Domi — strong, confident (F)',
-  'MF3mGyEYCl7XYWbV9V6O': 'Elli — youthful, friendly (F)',
-  'ThT5KcBeYPX3keUQqHPh': 'Dorothy — deep, narration (F)',
-  'pNInz6obpgDQGcFmaJgB': 'Adam — deep, versatile (M)',
-  'yoZ06aMxZJJ28mfd3POQ': 'Sam — smooth, professional (M)',
-  'TxGEqnHWrfWFTfGW9XjX': 'Josh — engaging, warm (M)',
-  'VR6AewLTigWG4xSOukaG': 'Arnold — bold, commanding (M)',
-  'ErXwobaYiN019PkySvjV': 'Antoni — friendly, casual (M)',
-};
-
-const _elevenLabsModels = <String, String>{
-  'eleven_flash_v2_5': 'Flash v2.5 — fastest (default)',
-  'eleven_turbo_v2_5': 'Turbo v2.5 — fast, higher quality',
-  'eleven_multilingual_v2': 'Multilingual v2',
-  'eleven_v3': 'Eleven v3 — most expressive, [laughs] tags',
-};
+// Provider vendors, models, and voices all come from the SDK's typed catalogs
+// (LlmVendor, GroqModel, DeepgramVoice, …) — no local lists to maintain.
 
 /// Step 1: pick providers/models/voices, enter keys, launch the conversation.
 class SetupPage extends StatefulWidget {
@@ -105,6 +51,12 @@ class _SetupPageState extends State<SetupPage> {
   final _elevenLabsKey = TextEditingController(
     text: const String.fromEnvironment('ELEVENLABS_API_KEY'),
   );
+  final _xaiKey = TextEditingController(
+    text: const String.fromEnvironment('XAI_API_KEY'),
+  );
+  final _zaiKey = TextEditingController(
+    text: const String.fromEnvironment('ZAI_API_KEY'),
+  );
   final _persona = TextEditingController(
     text: 'You are a friendly, concise voice assistant.',
   );
@@ -120,14 +72,16 @@ class _SetupPageState extends State<SetupPage> {
   final _silenceSeconds = TextEditingController();
   final _maxMinutes = TextEditingController();
 
-  LlmChoice _llm = LlmChoice.groq;
-  TtsChoice _tts = TtsChoice.deepgram;
-  String _groqModel = _groqModels.keys.first;
-  String _openAiModel = _openAiModels.keys.first;
-  String _geminiModel = _geminiModels.keys.first;
-  String _deepgramVoice = _deepgramVoices.keys.first;
-  String _elevenLabsVoice = _elevenLabsVoices.keys.first;
-  String _elevenLabsModel = _elevenLabsModels.keys.first;
+  LlmVendor _llm = LlmVendor.groq;
+  TtsVendor _tts = TtsVendor.deepgram;
+  GroqModel _groqModel = GroqModel.gptOss20b;
+  OpenAiModel _openAiModel = OpenAiModel.gpt41Mini;
+  GeminiModel _geminiModel = GeminiModel.flash25;
+  XaiModel _xaiModel = XaiModel.grok43;
+  ZaiModel _zaiModel = ZaiModel.glm46;
+  DeepgramVoice _deepgramVoice = DeepgramVoice.asteria;
+  ElevenLabsVoice _elevenLabsVoice = ElevenLabsVoice.sarah;
+  ElevenLabsModel _elevenLabsModel = ElevenLabsModel.flashV25;
   bool _naturalSpeech = true;
 
   @override
@@ -137,6 +91,8 @@ class _SetupPageState extends State<SetupPage> {
     _geminiKey.dispose();
     _deepgramKey.dispose();
     _elevenLabsKey.dispose();
+    _xaiKey.dispose();
+    _zaiKey.dispose();
     _persona.dispose();
     _assistantName.dispose();
     _greeting.dispose();
@@ -153,53 +109,55 @@ class _SetupPageState extends State<SetupPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  String _llmKey() => switch (_llm) {
+    LlmVendor.groq => _groqKey.text.trim(),
+    LlmVendor.openAi => _openAiKey.text.trim(),
+    LlmVendor.gemini => _geminiKey.text.trim(),
+    LlmVendor.xai => _xaiKey.text.trim(),
+    LlmVendor.zai => _zaiKey.text.trim(),
+  };
+
   void _start() {
-    final groqKey = _groqKey.text.trim();
-    final openAiKey = _openAiKey.text.trim();
-    final geminiKey = _geminiKey.text.trim();
     final dgKey = _deepgramKey.text.trim();
     final elKey = _elevenLabsKey.text.trim();
 
-    if (_llm == LlmChoice.groq && groqKey.isEmpty) {
-      return _snack('Enter your Groq API key.');
-    }
-    if (_llm == LlmChoice.openai && openAiKey.isEmpty) {
-      return _snack('Enter your OpenAI API key.');
-    }
-    if (_llm == LlmChoice.gemini && geminiKey.isEmpty) {
-      return _snack('Enter your Gemini API key.');
+    if (_llmKey().isEmpty) {
+      return _snack('Enter your ${_llm.displayName} API key.');
     }
     // Deepgram is always needed: it does the speech recognition (STT).
     if (dgKey.isEmpty) {
       return _snack('Enter your Deepgram API key (used to hear you).');
     }
-    if (_tts == TtsChoice.elevenlabs && elKey.isEmpty) {
+    if (_tts == TtsVendor.elevenLabs && elKey.isEmpty) {
       return _snack('Enter your ElevenLabs API key.');
     }
 
+    final llmKey = _llmKey();
     final greetingText = _greeting.text.trim();
     final assistantName = _assistantName.text.trim();
 
     // ── This is the entire SDK integration ────────────────────────────
     final session = VocraSession(
       config: VocraConfig(
-        // Provider facades pick the service in one line.
+        // Provider facades pick the service in one line, with typed models.
         llm: switch (_llm) {
-          LlmChoice.groq => VocraLlm.groq(apiKey: groqKey, model: _groqModel),
-          LlmChoice.openai => VocraLlm.openAi(
-            apiKey: openAiKey,
+          LlmVendor.groq => VocraLlm.groq(apiKey: llmKey, model: _groqModel),
+          LlmVendor.openAi => VocraLlm.openAi(
+            apiKey: llmKey,
             model: _openAiModel,
           ),
-          LlmChoice.gemini => VocraLlm.gemini(
-            apiKey: geminiKey,
+          LlmVendor.gemini => VocraLlm.gemini(
+            apiKey: llmKey,
             model: _geminiModel,
           ),
+          LlmVendor.xai => VocraLlm.xai(apiKey: llmKey, model: _xaiModel),
+          LlmVendor.zai => VocraLlm.zai(apiKey: llmKey, model: _zaiModel),
         },
-        tts: _tts == TtsChoice.deepgram
+        tts: _tts == TtsVendor.deepgram
             ? VocraTts.deepgram(apiKey: dgKey, voice: _deepgramVoice)
             : VocraTts.elevenLabs(
                 apiKey: elKey,
-                voiceId: _elevenLabsVoice,
+                voice: _elevenLabsVoice,
                 model: _elevenLabsModel,
               ),
         stt: VocraStt.deepgram(apiKey: dgKey),
@@ -263,12 +221,14 @@ class _SetupPageState extends State<SetupPage> {
     ),
   );
 
-  Widget _dropdown(
+  // One generic dropdown for ANY of the SDK's typed catalogs (GroqModel.values,
+  // DeepgramVoice.values, …) — they all implement CatalogEntry.
+  Widget _dropdown<T extends CatalogEntry>(
     String label,
-    Map<String, String> options,
-    String value,
-    ValueChanged<String> onChanged,
-  ) => DropdownButtonFormField<String>(
+    List<T> options,
+    T value,
+    ValueChanged<T> onChanged,
+  ) => DropdownButtonFormField<T>(
     initialValue: value,
     isExpanded: true,
     decoration: InputDecoration(
@@ -277,10 +237,13 @@ class _SetupPageState extends State<SetupPage> {
       isDense: true,
     ),
     items: [
-      for (final e in options.entries)
+      for (final o in options)
         DropdownMenuItem(
-          value: e.key,
-          child: Text(e.value, overflow: TextOverflow.ellipsis),
+          value: o,
+          child: Text(
+            o.note == null ? o.displayName : '${o.displayName} — ${o.note}',
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
     ],
     onChanged: (v) => onChanged(v!),
@@ -294,61 +257,79 @@ class _SetupPageState extends State<SetupPage> {
         padding: const EdgeInsets.all(16),
         children: [
           _sectionLabel('AI model (LLM)'),
-          SegmentedButton<LlmChoice>(
-            segments: const [
-              ButtonSegment(value: LlmChoice.groq, label: Text('Groq')),
-              ButtonSegment(value: LlmChoice.openai, label: Text('OpenAI')),
-              ButtonSegment(value: LlmChoice.gemini, label: Text('Gemini')),
-            ],
-            selected: {_llm},
-            onSelectionChanged: (s) => setState(() => _llm = s.first),
+          // Vendor picker built straight from the SDK's LlmVendor enum.
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SegmentedButton<LlmVendor>(
+              segments: [
+                for (final v in LlmVendor.values)
+                  ButtonSegment(value: v, label: Text(v.displayName)),
+              ],
+              selected: {_llm},
+              onSelectionChanged: (s) => setState(() => _llm = s.first),
+            ),
           ),
           const SizedBox(height: 12),
-          if (_llm == LlmChoice.groq) ...[
+          if (_llm == LlmVendor.groq) ...[
             _keyField(_groqKey, 'Groq API key (gsk_…)'),
             const SizedBox(height: 12),
             _dropdown(
               'Model',
-              _groqModels,
+              GroqModel.values,
               _groqModel,
               (v) => setState(() => _groqModel = v),
             ),
-          ] else if (_llm == LlmChoice.openai) ...[
+          ] else if (_llm == LlmVendor.openAi) ...[
             _keyField(_openAiKey, 'OpenAI API key (sk-…)'),
             const SizedBox(height: 12),
             _dropdown(
               'Model',
-              _openAiModels,
+              OpenAiModel.values,
               _openAiModel,
               (v) => setState(() => _openAiModel = v),
             ),
-          ] else ...[
+          ] else if (_llm == LlmVendor.gemini) ...[
             _keyField(_geminiKey, 'Gemini API key (AIza…)'),
             const SizedBox(height: 12),
             _dropdown(
               'Model',
-              _geminiModels,
+              GeminiModel.values,
               _geminiModel,
               (v) => setState(() => _geminiModel = v),
             ),
+          ] else if (_llm == LlmVendor.xai) ...[
+            _keyField(_xaiKey, 'xAI API key (xai-…)'),
+            const SizedBox(height: 12),
+            _dropdown(
+              'Model',
+              XaiModel.values,
+              _xaiModel,
+              (v) => setState(() => _xaiModel = v),
+            ),
+          ] else ...[
+            _keyField(_zaiKey, 'Z.ai API key'),
+            const SizedBox(height: 12),
+            _dropdown(
+              'Model',
+              ZaiModel.values,
+              _zaiModel,
+              (v) => setState(() => _zaiModel = v),
+            ),
           ],
           _sectionLabel('Voice (TTS)'),
-          SegmentedButton<TtsChoice>(
-            segments: const [
-              ButtonSegment(value: TtsChoice.deepgram, label: Text('Deepgram')),
-              ButtonSegment(
-                value: TtsChoice.elevenlabs,
-                label: Text('ElevenLabs'),
-              ),
+          SegmentedButton<TtsVendor>(
+            segments: [
+              for (final v in TtsVendor.values)
+                ButtonSegment(value: v, label: Text(v.displayName)),
             ],
             selected: {_tts},
             onSelectionChanged: (s) => setState(() => _tts = s.first),
           ),
           const SizedBox(height: 12),
-          if (_tts == TtsChoice.deepgram)
+          if (_tts == TtsVendor.deepgram)
             _dropdown(
               'Voice',
-              _deepgramVoices,
+              DeepgramVoice.values,
               _deepgramVoice,
               (v) => setState(() => _deepgramVoice = v),
             )
@@ -357,14 +338,14 @@ class _SetupPageState extends State<SetupPage> {
             const SizedBox(height: 12),
             _dropdown(
               'Voice',
-              _elevenLabsVoices,
+              ElevenLabsVoice.values,
               _elevenLabsVoice,
               (v) => setState(() => _elevenLabsVoice = v),
             ),
             const SizedBox(height: 12),
             _dropdown(
               'Model',
-              _elevenLabsModels,
+              ElevenLabsModel.values,
               _elevenLabsModel,
               (v) => setState(() => _elevenLabsModel = v),
             ),

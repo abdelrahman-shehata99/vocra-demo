@@ -10,9 +10,9 @@ void main() {
     await tester.pumpWidget(const VocraDemoApp());
     await tester.pump();
 
-    // LLM + TTS provider toggles.
+    // LLM vendor labels (from the SDK's LlmVendor enum) + TTS toggles.
     expect(find.text('Groq'), findsOneWidget);
-    expect(find.text('Gemini'), findsOneWidget);
+    expect(find.text('OpenAI'), findsOneWidget);
     expect(find.text('Deepgram'), findsOneWidget);
     expect(find.text('ElevenLabs'), findsOneWidget);
 
@@ -22,10 +22,10 @@ void main() {
     expect(find.text('Voice'), findsOneWidget);
     expect(find.text('Deepgram API key (always required)'), findsOneWidget);
 
-    // Switching the LLM toggle swaps the key/model panel.
-    await tester.tap(find.text('Gemini'));
+    // Switching the LLM vendor swaps the key/model panel.
+    await tester.tap(find.text('OpenAI'));
     await tester.pumpAndSettle();
-    expect(find.text('Gemini API key (AIza…)'), findsOneWidget);
+    expect(find.text('OpenAI API key (sk-…)'), findsOneWidget);
     expect(find.text('Groq API key (gsk_…)'), findsNothing);
 
     // Switching TTS to ElevenLabs asks for its key.
@@ -41,6 +41,6 @@ void main() {
     );
     await tester.tap(find.widgetWithText(FilledButton, 'Start conversation'));
     await tester.pump();
-    expect(find.text('Enter your Gemini API key.'), findsOneWidget);
+    expect(find.text('Enter your OpenAI API key.'), findsOneWidget);
   });
 }
